@@ -4,28 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-contourpy = "*"
-cycler = "*"
-fonttools = "*"
-joblib = "*"
-kiwisolver = "*"
-matplotlib = "*"
-numpy = "*"
-packaging = "*"
-pandas = "*"
-pillow = "*"
-pyparsing = "*"
-python-dateutil = "*"
-pytz = "*"
-scikit-learn = "*"
-scipy = "*"
-seaborn = "*"
-six = "*"
-threadpoolctl = "*"
-tzdata = "*"
-xgboost = "*"
-lightgbm = "*"
-shap = "*"
+
 
 [dev-packages]
 
