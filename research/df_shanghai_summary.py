@@ -20,7 +20,6 @@ class DiabetesDataPreprocessor:
         df2 = pd.read_csv(self.folder_path.joinpath('Shanghai_T2DM_Summary.csv'))
 
         self.df = pd.concat([df1, df2], ignore_index=True)
-        self.df.to_csv('after_load_and_combine_data.csv')
         return self
 
     def handle_missing_values(self):

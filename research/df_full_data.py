@@ -43,7 +43,7 @@ class DfFullData:
         self.df = merger_df
         return merger_df
 
-    def __process_col(self, name_col, match_pattern, split_by):  # сделай приватный метод
+    def process_col(self, name_col, match_pattern, split_by):
         unique_values = set()
 
         for values in self._load_and_merge_final_data()[name_col].dropna():
@@ -61,7 +61,7 @@ class DfFullData:
 
     def __normalize_insulin_dose_sc(self):
 
-        insulin_dose_sc = self.__process_col('Insulin dose - s.c.', r'\s*(.*?),\s*\d+\s*IU', ';')
+        insulin_dose_sc = self.process_col('Insulin dose - s.c.', r'\s*(.*?),\s*\d+\s*IU', ';')
 
         med_normalization_map = {
             'insulin\xa0glargine': 'insulin_glargine',
@@ -108,30 +108,67 @@ class DfFullData:
                     if part.strip().lower().startswith(medicament.lower())
                 ) if pd.notna(x) else 0
             )
+        self.df = self.df.drop(columns=['Insulin dose - s.c.'], axis=1)
 
         return self
 
     def __normalize_insulin_dose_iv(self):
-        insulin_dose_iv = self.__process_col('Insulin dose - i.v.', r'\s*(.*?),\s*\d+\s*IU', ';')
+        insulin_names = set()
 
-        for medicament in insulin_dose_iv:
+        for text in self.df[
+            'Insulin dose - i.v.'].dropna():  # search all rows from the ‘Insulin dose - i.v.’ column that are not empty
+            matches = re.findall(r'(\d+)\s*IU\s+([A-Za-z][A-Za-z\s\d\-]*)',
+                                 text)  # regular expression that searches for fragments of the following type: 12 IU Novolin R
+
+            # In each line, look for all fragments that match the pattern (number + IU + name)
+            # For example, if the string is: 500ml 0.9% sodium chloride, 12 IU Novolin R, 10 ml KCl The matches would be: [(‘12’, ‘Novolin R’)].
+
+            for dose, name in matches:
+                insulin_names.add(name.strip())
+                # Add the found insulin name (e.g. Novolin R) to the insulin_names set.
+
+        for medicament in insulin_names:
             norm_med = medicament.strip().lower().replace(" ", "_").replace("-", "_")
             col_name = f'dose_{norm_med}'
 
-            if col_name not in self.df.columns: self.df[col_name] = 0
-
-            self.df[col_name] = self.df['Insulin dose - i.v.'].apply(
+            new_values = self.df['Insulin dose - i.v.'].apply(
                 lambda x: sum(
                     int(match.group(1))
-                    for match in re.finditer(rf'(\d+)\s*IU\s*{re.escape(medicament)}', x, re.IGNORECASE)
+                    for match in re.finditer(rf'(\d+)\s*IU\s+{re.escape(medicament)}', x, re.IGNORECASE)
                 ) if pd.notna(x) else 0
             )
+
+            existing_col = self.df.get(col_name, pd.Series(0, index=self.df.index))
+            self.df[col_name] = existing_col + new_values
+
+        self.df = self.df.drop(columns=['Insulin dose - i.v.'], axis=1)
+
         return self
 
-    def __normalize_bolus_insulin(self):
-        return self
+    def __normalize_csii_dose_insulin(self):
+        cols = [
+            'CSII - bolus insulin (Novolin R, IU)',
+            'CSII - basal insulin (Novolin R, IU / H)',
+        ]
 
-    def __normalize_basal_insulin(self):
+        for col in cols:
+            def extract_dose(value):
+                if isinstance(value, str) and "temporarily suspend insulin delivery" in value.lower():
+                    return 0
+                try:
+                    return float(value)
+                except:
+                    return 0
+
+            existing = self.df.get('dose_novolin_r', pd.Series(0, index=self.df.index)).fillna(0)
+
+            doses = self.df[col].apply(extract_dose).fillna(0)
+            existing = existing + doses
+
+            self.df['dose_novolin_r'] = existing
+
+            self.df = self.df.drop(columns=[col], axis=1)
+
         return self
 
     def __normalize_non_insulin_agents(self):
@@ -140,9 +177,7 @@ class DfFullData:
     def normalize_all(self):
         return (self
                 .__normalize_insulin_dose_sc()
-                # .__normalize_insulin_dose_iv()
-                # .__normalize_bolus_insulin()
-                # .__normalize_basal_insulin()
-                # .__normalize_non_insulin_agents()
+                .__normalize_insulin_dose_iv()
+                .__normalize_csii_dose_insulin()
+                .__normalize_non_insulin_agents()
                 )
-
