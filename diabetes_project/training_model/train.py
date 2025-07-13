@@ -54,7 +54,7 @@ INPUT_DIM = len(seq_cols)
 STATIC_DIM = len(static_cols)
 HIDDEN_DIM = 64
 
-df = pd.read_csv(Path('../test_data/train_data.csv'))
+df = pd.read_csv(Path('../data/train_data.csv'))
 
 dataset = DiabetesDataset(df, seq_cols, static_cols, seq_len=SEQ_LEN).get_dataset()
 dataset = dataset.shuffle(100).batch(BATCH_SIZE)
