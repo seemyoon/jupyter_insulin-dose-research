@@ -243,6 +243,8 @@ class DataImporter:
         except Exception as e:
             raise TypeError(f'[ERROR] _import_diabetes_tablet for ID {patient_id}: {e}')
 
+    def _import_therapy(self, patient_id, group):
+        pass
 
     def _get_or_create_partition(self, partition_name: str):
         partition = self.session.query(DatasetPartition).filter_by(name=partition_name).first()
