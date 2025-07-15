@@ -1,14 +1,14 @@
 from sqlalchemy import Column, String, Integer, ForeignKey, Float
 from sqlalchemy.orm import relationship
 
-from diabetes_project.infrastructure.db.base import Base
+from db.base import Base
 
 
 class Patient(Base):
     __tablename__ = 'patient'
 
-    id = Column(String, primary_key=True)
-    dataset_partition_id = Column(Integer, ForeignKey("dataset_partition.id"))
+    id = Column(String, primary_key=True, nullable=False)
+    dataset_partition_id = Column(Integer, ForeignKey("dataset_partition.id"), nullable=False)
 
     dataset_partition = relationship("DatasetPartition", back_populates="patients")
 
@@ -19,6 +19,8 @@ class Patient(Base):
     medical_static = relationship("PatientMedicalStatic", back_populates="patient", uselist=False)
 
     measurements = relationship("Measurement", back_populates="patient")
+
+    dietary_intake = relationship("DietaryIntake", back_populates="patient")
 
     gender = Column(Integer)
     age = Column(Integer)

@@ -2,8 +2,10 @@
 /my_notes.txt
 /info_ml.txt
 /data_processed/
-/data/Shanghai_diabetes_datasets/
-/data/tongue_diabetes_2_types/
-/data/women_prediction_diabetes/
+/full_data/Shanghai_diabetes_datasets/
+/full_data/tongue_diabetes_2_types/
 /diabetes_project/finish_data.csv
 /diabetes_project/infrastructure/.env
+/.env
+/diabetes_project/cleaned_data/finish_data.csv
+/cleaned_data/finish_data.csv
