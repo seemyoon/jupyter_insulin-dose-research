@@ -1,8 +1,7 @@
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 
 from db.engine import engine
-from db.models import Patient, DatasetPartition
-import torch
+from db.models import Patient, DatasetPartition, AdditionalDrugs, Comorbidities
 
 
 class Repository:
@@ -11,7 +10,7 @@ class Repository:
         self.session = Session()
 
     def get_patients_td(self):  # td - train dataset
-        patients_noformat = (
+        return (
             self.session
             .query(Patient)
             .join(DatasetPartition)
@@ -19,29 +18,29 @@ class Repository:
             .all()
         )
 
-        return torch.tensor([[
-            p.gender,
-            p.age,
-            p.height,
-            p.weight,
-            p.smoking_history,
-            p.alcohol_drinking_history,
-        ] for p in patients_noformat], dtype=torch.float32)
+    def get_patient_drugs_map(self):
+        query = (
+            self.session
+            .query(Patient.id, AdditionalDrugs.id)
+            .join(AdditionalDrugs)
+        )
 
-    def get_static_features_td(self, session: Session):
-        pass
+        mapping = {}
 
-    def _get_patient_ids_td(self):
-        return [
-            pid for (pid,) in self
-            .session
-            .query(Patient.id)
-            .join(DatasetPartition)
-            .filter(DatasetPartition.name == 'train')
-            .all()
-        ]
+        for pid, value in query:
+            mapping.setdefault(pid, []).append(value)
 
+        return mapping
 
-if __name__ == '__main__':
-    repo = Repository()
-    repo.get_patients_td()
+    def get_patient_comorbities_map(self):
+        query = (self.session
+                 .query(Patient.id, Comorbidities.id)
+                 .join(Comorbidities)
+                 )
+
+        mapping = {}
+
+        for pid, value in query:
+            mapping.setdefault(pid, []).append(value)
+
+        return mapping

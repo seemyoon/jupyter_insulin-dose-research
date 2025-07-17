@@ -1,33 +1,31 @@
-from pathlib import Path
+from training_model.preparing.static_embedding_encoder import StaticEmbedderEncoder
+from training_model.preparing.static_preprocessing import StaticProcessing
+from training_model.repository import Repository
 
-from load_data_to_db import DataImporter
+repo = Repository()
 
+patients = repo.get_patients_td()
 
-def main():
-    root_dir = Path(__file__).resolve().parent
+patient_to_drugs = repo.get_patient_drugs_map()
+patient_to_comorbities = repo.get_patient_comorbities_map()
 
-    data = {
-        'train': {
-            'name': 'train',
-            'file': root_dir / "cleaned_data" / "train_data.csv"
-        },
-        'test': {
-            'name': 'test',
-            'file': root_dir / "cleaned_data" / "test_data.csv"
-        },
+unique_drugs = StaticProcessing.get_unique_entities(list(patient_to_drugs.values()))
+unique_comorbities = StaticProcessing.get_unique_entities(list(patient_to_comorbities.values()))
 
-    }
+static_tensor, drug_indices, comorb_indices = StaticProcessing.get_static_tensor_with_embeddings(
+    patients,
+    unique_drugs,
+    unique_comorbities,
+    patient_to_drugs,
+    patient_to_comorbities)
 
-    if not data['train']['file'].exists():
-        print(f"file is not exist: {data['train']['name']}")
-        return
+# creating a static data encoder model
+static_dim = static_tensor.shape[1]  # static_tensor.shape = (e.g. 128, 9) → 128 patients, each with 9 features
+unique_drugs_size = len(unique_drugs)
+unique_comorbities_size = len(unique_comorbities)
+emb_dim = 32  # 32 - is default
+hidden_dim = 64
 
-    if not data['test']['file'].exists():
-        print(f"file is not exist: {data['test']['name']}")
-        return
+encoder = StaticEmbedderEncoder(static_dim, unique_drugs_size, unique_comorbities_size, emb_dim, hidden_dim)
 
-    importer = DataImporter(data['train']['name'])
-    importer.import_from_data(str(data['train']['file']))
-
-
-if __name__ == '__main__': main()
+static_data = encoder(static_tensor, drug_indices, comorb_indices)
