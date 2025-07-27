@@ -3,7 +3,8 @@ from sqlalchemy.orm import sessionmaker
 
 from db.engine import engine
 from db.models import Patient, PatientMedicalStatic, AdditionalDrugs, Comorbidities, \
-    DatasetPartition, DietaryIntake, Measurement, Insulin, DiabetesTablets, TakingInsulin, TakingDiabetesTablet
+    DatasetPartition, DietaryIntake, Measurement, Insulin, DiabetesTablets, TakingInsulin, TakingDiabetesTablet, \
+    Hospitalization
 from utils.convert_python_format import to_python_format
 
 
@@ -57,6 +58,7 @@ class DataImporter:
                 self._import_measurement(patient_id, group)
                 self._import_insulin_dose(patient_id, group)
                 self._import_diabetes_tablet(patient_id, group)
+                self._import_hospitalization(patient_id, group)
 
             self.session.commit()
         except Exception as e:
@@ -187,7 +189,6 @@ class DataImporter:
         except Exception as e:
             raise TypeError(f'[ERROR] _import_measurement for ID {patient_id}: {e}')
 
-
     def _import_insulin_dose(self, patient_id, group):
         try:
 
@@ -211,7 +212,6 @@ class DataImporter:
         except Exception as e:
             self.session.rollback()
             raise TypeError(f'[ERROR] import_insulin_doses for ID {patient_id}: {e}')
-
 
     def _import_diabetes_tablet(self, patient_id, group):
         try:
@@ -243,8 +243,34 @@ class DataImporter:
         except Exception as e:
             raise TypeError(f'[ERROR] _import_diabetes_tablet for ID {patient_id}: {e}')
 
+    def _import_hospitalization(self, patient_id, group):
+        try:
+            iv_cols = [col for col in group.columns if col.endswith('_iv') and col.startswith('dose_')]
+
+            for _, row in group.iterrows():
+                time_fields = self._extract_time_fields(row)
+
+                for col in iv_cols:
+                    dose_value = row.get(col)
+                    if pd.notna(dose_value) and float(dose_value) > 0:
+                        insulin_name = col.replace('dose_', '').replace('_', '').title()
+                        insulin_id = self._get_or_create_insulin_id(insulin_name)
+
+                        hospitalization = Hospitalization(
+                            patient_id=str(patient_id),
+                            insulin_id=insulin_id,
+                            dose=to_python_format(dose_value),
+                            **time_fields
+                        )
+                        self.session.add(hospitalization)
+
+        except Exception as e:
+            raise TypeError(f'[ERROR] import_hospitalization for ID {patient_id}: {e}')
+
+
     def _import_therapy(self, patient_id, group):
         pass
+
 
     def _get_or_create_partition(self, partition_name: str):
         partition = self.session.query(DatasetPartition).filter_by(name=partition_name).first()

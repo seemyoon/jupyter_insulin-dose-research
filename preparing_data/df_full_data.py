@@ -2,9 +2,9 @@ import re
 from pathlib import Path
 
 import pandas as pd
+from preparing_data.df_shanghai_summary import main
 
-from df_shanghai_summary import main
-from df_shanghai_time_series import DfShanghaiTimeSeries
+from preparing_data.df_shanghai_time_series import DfShanghaiTimeSeries
 
 
 class DfFullData:
@@ -88,17 +88,17 @@ class DfFullData:
             col_name = f'dose_{norm_med}'
             """
             ➤ Suppose x is "Humulin R, 2 IU; insulin degludec, 12 IU". medicament - "insulin degludec"
-            
+
             ➤ x.split(‘;’) - ["Humulin R, 2 IU", " insulin degludec, 12 IU"]
-            
+
             ➤ for part in x.split(‘;’) - first "Humulin R, 2 IU" and then " insulin degludec, 12 IU"
-            
+
             ➤ if part.strip().lower().startswith(medicament.lower()) - If part of the string starts with the name of the medicine (medicament) - ignoring spaces and case - then process that part. " insulin degludec, 12 IU" - it starts with "insulin degludec".
-            
+
             ➤ part.strip().split(‘,’)[1]: → "insulin degludec, 12 IU" → split(‘,’) → ["insulin degludec", " 12 IU"] → Take [1] → " 12 IU"
-            
+
             ➤ .strip().split()[0] → " 12 IU" → .strip() → "12 IU" → .split() → ["12", "IU"] → Take [0] → "12"
-            
+
             ➤ int(...)→ Convert "12" → 12 (int type)
             """
             self.df[col_name] = self.df['Insulin dose - s.c.'].apply(
@@ -129,7 +129,7 @@ class DfFullData:
 
         for medicament in insulin_names:
             norm_med = medicament.strip().lower().replace(" ", "_").replace("-", "_")
-            col_name = f'dose_{norm_med}'
+            col_name = f'dose_insulin_{norm_med}_iv'
 
             new_values = self.df['Insulin dose - i.v.'].apply(
                 lambda x: sum(
@@ -144,6 +144,39 @@ class DfFullData:
         self.df = self.df.drop(columns=['Insulin dose - i.v.'], axis=1)
 
         return self
+
+    # def __normalize_insulin_dose_iv(self):
+    #     insulin_names = set()
+    #
+    #     for text in self.df[
+    #         'Insulin dose - i.v.'].dropna():  # search all rows from the ‘Insulin dose - i.v.’ column that are not empty
+    #         matches = re.findall(r'(\d+)\s*IU\s+([A-Za-z][A-Za-z\s\d\-]*)',
+    #                              text)  # regular expression that searches for fragments of the following type: 12 IU Novolin R
+    #
+    #         # In each line, look for all fragments that match the pattern (number + IU + name)
+    #         # For example, if the string is: 500ml 0.9% sodium chloride, 12 IU Novolin R, 10 ml KCl The matches would be: [(‘12’, ‘Novolin R’)].
+    #
+    #         for dose, name in matches:
+    #             insulin_names.add(name.strip())
+    #             # Add the found insulin name (e.g. Novolin R) to the insulin_names set.
+    #
+    #     for medicament in insulin_names:
+    #         norm_med = medicament.strip().lower().replace(" ", "_").replace("-", "_")
+    #         col_name = f'dose_{norm_med}'
+    #
+    #         new_values = self.df['Insulin dose - i.v.'].apply(
+    #             lambda x: sum(
+    #                 int(match.group(1))
+    #                 for match in re.finditer(rf'(\d+)\s*IU\s+{re.escape(medicament)}', x, re.IGNORECASE)
+    #             ) if pd.notna(x) else 0
+    #         )
+    #
+    #         existing_col = self.df.get(col_name, pd.Series(0, index=self.df.index))
+    #         self.df[col_name] = existing_col + new_values
+    #
+    #     self.df = self.df.drop(columns=['Insulin dose - i.v.'], axis=1)
+    #
+    #     return self
 
     def __normalize_csii_dose_insulin(self):
         cols = [

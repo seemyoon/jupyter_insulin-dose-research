@@ -1,5 +1,3 @@
-from locale import normalize
-
 import torch
 from sklearn.preprocessing import MinMaxScaler
 
@@ -17,7 +15,7 @@ class StaticProcessing:
         """
         unique_ids = set(entity for entity_sublist in entity_list for entity in entity_sublist)  # {5, 12, 7}
         # return {entity_id: idx for idx, entity_id in enumerate(sorted(unique_ids))}  # {5: 0, 7: 1, 12: 2}
-        return {entity_id: idx+1 for idx, entity_id in enumerate(sorted(unique_ids))}  # {5: 0, 7: 1, 12: 2}
+        return {entity_id: idx + 1 for idx, entity_id in enumerate(sorted(unique_ids))}  # {5: 0, 7: 1, 12: 2}
 
     @staticmethod
     def normalize_features(features):
@@ -37,8 +35,8 @@ class StaticProcessing:
         """
 
         raw_static_features = []
-        drug_indices = []
-        comorb_indices = []
+        drug_indices = []  # [[1, 2], [3], [], [1, 5]]
+        comorb_indices = []  # [[4], [2, 6], [], []]
 
         for patient in patients:
             features = [
