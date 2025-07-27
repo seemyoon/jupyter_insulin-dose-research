@@ -9,6 +9,7 @@ from .comorbidities import Comorbidities
 from .dataset_partition import DatasetPartition
 from .measurement import Measurement
 from .dietary_intake import DietaryIntake
+from .hospitalization import Hospitalization
 
 __all__ = [
     "Patient",
@@ -21,5 +22,6 @@ __all__ = [
     "Comorbidities",
     "DatasetPartition",
     'Measurement',
-    'DietaryIntake'
+    'DietaryIntake',
+    'Hospitalization'
 ]
