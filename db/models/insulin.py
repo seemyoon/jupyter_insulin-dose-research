@@ -10,5 +10,6 @@ class Insulin(Base):
     id = Column(Integer, primary_key=True, nullable=False)
 
     taking_insulins = relationship("TakingInsulin", back_populates="insulin")
+    hospitalizations = relationship('Hospitalization', back_populates="insulin")
 
     name = Column(String)

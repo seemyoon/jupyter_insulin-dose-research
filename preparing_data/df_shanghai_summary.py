@@ -347,7 +347,8 @@ class DiabetesFeatureEngineer:
 
 def main():
     # Initialize preprocessor
-    preprocessor = DiabetesDataPreprocessor('../cleaned_data/Shanghai_diabetes_datasets/clinical_info/csv')
+    print(os.getcwd())
+    preprocessor = DiabetesDataPreprocessor('../full_data/Shanghai_diabetes_datasets/clinical_info/csv')
 
     # Load and process full_data
     df = (preprocessor
@@ -367,7 +368,6 @@ def main():
     ])
           .rename_column('Hypoglycemia (yes/no)', 'has_hypoglycemia')
           .get_data())
-
 
     print(f"Final dataframe shape: {df.shape}")
     return df

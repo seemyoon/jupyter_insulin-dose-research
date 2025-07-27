@@ -17,6 +17,7 @@ class Patient(Base):
     additional_drugs = relationship("AdditionalDrugs", back_populates="patient")
     comorbidities = relationship("Comorbidities", back_populates="patient")
     medical_static = relationship("PatientMedicalStatic", back_populates="patient", uselist=False)
+    hospitalizations = relationship("Hospitalization", back_populates="patient")
 
     measurements = relationship("Measurement", back_populates="patient")
 
