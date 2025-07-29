@@ -1,6 +1,7 @@
 from training_model.preparing.static_embedding_encoder import StaticEmbedderEncoder
 from training_model.preparing.static_preprocessing import StaticProcessing
 from training_model.repository import Repository
+from utils.make_windows import MakeWindows
 
 
 class FullModel:
@@ -42,10 +43,21 @@ class FullModel:
         #         [0.4, 0.9, 0.6]])  # for the third
 
     def get_dynamic_data(self):
-        pass
+        insulin_val = self.repo.get_taking_insulin()
+        tablets_val = self.repo.get_taking_tablets()
+        meas = self.repo.get_measurements()
+        food_intake = self.repo.get_dietary()
+
+        return MakeWindows().build_feature_windows(insulin_val, tablets_val, meas, food_intake)
 
     def main(self):
-        pass
+        static_dict = self.get_static_data()
+        windows = self.get_dynamic_data()
+
+        # quantity uniques drugs
+        num_ins = len(self.repo.get_insulin_list())
+        num_pil = len(self.repo.get_tablets_list())
+
 
 
 if __name__ == '__main__':
