@@ -59,13 +59,13 @@ class MakeWindows:
                          pat_id, [])]
             """
             EXAMPLE: times = [
-            datetime.datetime(2025, 7, 25, 8, 0),    # insulin
-            datetime.datetime(2025, 7, 25, 18, 30),  # insulin
-            datetime.datetime(2025, 7, 25, 7, 45),   # CGM measurement
-            datetime.datetime(2025, 7, 25, 19, 0),   # CBG measurement
-            datetime.datetime(2025, 7, 25, 12, 0),   # meal
-            datetime.datetime(2025, 7, 25, 8, 30),   # pills
-            datetime.datetime(2025, 7, 25, 20, 0),   # pills
+                datetime.datetime(2025, 7, 25, 8, 0),    # insulin
+                datetime.datetime(2025, 7, 25, 18, 30),  # insulin
+                datetime.datetime(2025, 7, 25, 7, 45),   # CGM measurement
+                datetime.datetime(2025, 7, 25, 19, 0),   # CBG measurement
+                datetime.datetime(2025, 7, 25, 12, 0),   # meal
+                datetime.datetime(2025, 7, 25, 8, 30),   # pills
+                datetime.datetime(2025, 7, 25, 20, 0),   # pills
             ]
             """
 
@@ -133,20 +133,28 @@ class MakeWindows:
         return [record for record in records if current_period <= self.to_dt(record) < next_period]
 
     @staticmethod
-    def _sum_doses_by_type(records, dose_attr, related_name_attr):
+    def _sum_doses_by_type(records, dose_attr, related_name_attr) -> dict:
         """
 
         :param records: list of records (e.g., TakingInsulin).
         :param dose_attr: name of the field with the dose (‘dose’).
         :param related_name_attr: name of the related field pointing to the table with the name of the drug (‘insulin’, ‘diabetes_tablet’, etc.).
+        return: example { 1: 14.0, 3: 6.0 }
+
         """
         dict_grouped = defaultdict(float)
+
+        """
+            1. We take all records for insulin (or pills) within the current time window.
+            2. For each drug, we extract the med_id (insulin or pill ID).
+            3. We take the dose (record.dose) and add it to the counter for that ID.
+        """
 
         for record in records:
             med = getattr(record, related_name_attr, None)
             med_id = getattr(med, 'id', None)
 
             if med_id:
-                dict_grouped[med_id] += getattr(record, dose_attr)
+                dict_grouped[med_id] += getattr(record, dose_attr, 0.0)
 
         return dict(dict_grouped)
