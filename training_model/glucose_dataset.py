@@ -89,7 +89,7 @@ class GlucoseDataset(Dataset):
         }
 
     @staticmethod
-    def collate(batch):
+    def collate_fn(batch):
 
         """
         torch.stack()    Stacks tensors of the same size into a batch
