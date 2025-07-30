@@ -1,3 +1,9 @@
+from torch.utils.data import DataLoader
+from torch.optim import Adam
+import torch.nn as nn
+
+from training_model.diabetes_model import DiabetesModel
+from training_model.glucose_dataset import GlucoseDataset
 from training_model.preparing.static_embedding_encoder import StaticEmbedderEncoder
 from training_model.preparing.static_preprocessing import StaticProcessing
 from training_model.repository import Repository
@@ -56,8 +62,32 @@ class FullModel:
 
         # quantity uniques drugs
         num_ins = len(self.repo.get_insulin_list())
-        num_pil = len(self.repo.get_tablets_list())
+        num_drug_types = len(self.repo.get_tablets_list())
 
+        glucose_dataset = GlucoseDataset(windows, static_dict, num_ins, num_drug_types)
+        data_loader = DataLoader(glucose_dataset, batch_size=32, shuffle=True, collate_fn=GlucoseDataset.collate_fn)
+
+        model = DiabetesModel(static_dim=64, hidden_size=64, num_drug_types=num_drug_types, num_insulin_types=num_ins)
+
+        optimizer = Adam(model.parameters(),
+                         lr=1e-3)  # learning rate - 1e-3 = 0.001. This is how much the model changes its parameters after each training iteration.
+        mse = nn.MSELoss()
+
+        model.train()
+
+        for epoch in range(10):
+            loss_store = 0
+            for batch in data_loader:
+                dynamic, static, food_intake = batch['measurements'], batch['static'], batch['food_intake']
+                y_insulin, y_diabetes_tablet = batch['y_insulin'], batch['y_insulin']
+
+                optimizer.zero_grad()
+                pred_ins, pred_drug_tabl = model(dynamic, static, food_intake)
+                loss = mse(pred_ins, y_insulin) + mse(pred_drug_tabl, y_diabetes_tablet)
+                loss.backward()
+                optimizer.step()
+                loss_store += loss.item()
+            print(f'epoch {epoch:2d} loss={loss_store / len(data_loader):4f}')
 
 
 if __name__ == '__main__':
