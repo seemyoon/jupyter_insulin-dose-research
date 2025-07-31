@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-import torch as nn
+import torch.nn as nn
 
 from utils.embed_and_pool import embed_and_pool
 

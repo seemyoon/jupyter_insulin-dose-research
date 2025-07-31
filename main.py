@@ -69,10 +69,9 @@ class FullModel:
 
         model = DiabetesModel(static_dim=64, hidden_size=64, num_drug_types=num_drug_types, num_insulin_types=num_ins)
 
-        optimizer = Adam(model.parameters(),
-                         lr=1e-3)  # learning rate - 1e-3 = 0.001. This is how much the model changes its parameters after each training iteration.
+        optimizer = Adam(model.parameters(), lr=1e-3)
+        # learning rate - 1e-3 = 0.001. This is how much the model changes its parameters after each training iteration.
         mse = nn.MSELoss()
-
         model.train()
 
         for epoch in range(10):

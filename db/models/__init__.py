@@ -4,12 +4,14 @@ from .insulin import Insulin
 from .taking_insulin import TakingInsulin
 from .diabetes_tablet import DiabetesTablets
 from .taking_diabetes_tablet import TakingDiabetesTablet
-from .additional_drug import AdditionalDrugs
+from .additional_drug import AdditionalDrug
 from .comorbidities import Comorbidities
 from .dataset_partition import DatasetPartition
 from .measurement import Measurement
 from .dietary_intake import DietaryIntake
 from .hospitalization import Hospitalization
+from .patient_additional_drug import PatientAdditionalDrug
+from .patient_comorbidities import PatientComorbidities
 
 __all__ = [
     "Patient",
@@ -18,8 +20,10 @@ __all__ = [
     "TakingInsulin",
     "DiabetesTablets",
     "TakingDiabetesTablet",
-    "AdditionalDrugs",
+    "AdditionalDrug",
     "Comorbidities",
+    "PatientAdditionalDrug",
+    "PatientComorbidities",
     "DatasetPartition",
     'Measurement',
     'DietaryIntake',

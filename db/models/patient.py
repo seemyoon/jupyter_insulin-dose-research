@@ -14,8 +14,8 @@ class Patient(Base):
 
     insulins = relationship("TakingInsulin", back_populates="patient")
     tablets = relationship("TakingDiabetesTablet", back_populates="patient")
-    additional_drugs = relationship("AdditionalDrugs", back_populates="patient")
-    comorbidities = relationship("Comorbidities", back_populates="patient")
+    additional_drugs = relationship("PatientAdditionalDrug", back_populates="patient")
+    comorbidities = relationship("PatientComorbidities", back_populates="patient")
     medical_static = relationship("PatientMedicalStatic", back_populates="patient", uselist=False)
     hospitalizations = relationship("Hospitalization", back_populates="patient")
 

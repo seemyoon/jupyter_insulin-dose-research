@@ -23,9 +23,13 @@ class DiabetesModel(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, dynamic_data, static_data, food_intake):
-        _, (hidden) = self.lstm(
+        # print('dynamic_data shape: ', dynamic_data.shape)
+        # print('static_data shape: ', static_data.shape)
+        # print('food_intake shape: ', food_intake.shape)
+
+        _, (h_n) = self.lstm(
             dynamic_data)  # dynamic_data — [B, T, 3] B - Batch size (f.e 32),Time steps (f.e 24), 3 (quantity of features: CGM, CBG, blood_ketones)
-        hidden = hidden[-1]
+        hidden = h_n[-1]
 
         stat = self.relu(self.static_data(static_data))
         food_int = self.relu(self.food_intake(food_intake))

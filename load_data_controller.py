@@ -26,8 +26,8 @@ def main():
         print(f"file is not exist: {data['test']['name']}")
         return
 
-    importer = DataImporter(data['test']['name'])
-    importer.import_from_data(str(data['test']['file']))
+    importer = DataImporter(data['train']['name'])
+    importer.import_from_data(str(data['train']['file']))
 
 
 if __name__ == '__main__': main()

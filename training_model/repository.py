@@ -1,9 +1,10 @@
+from sqlalchemy import exists
 from sqlalchemy.orm import sessionmaker
 
 from db.engine import engine
-from db.models import Patient, DatasetPartition, AdditionalDrugs, Comorbidities, Insulin, DiabetesTablets, \
-    TakingInsulin, Hospitalization, Measurement, DietaryIntake, TakingDiabetesTablet
-from sqlalchemy import exists
+from db.models import Patient, DatasetPartition, Insulin, DiabetesTablets, \
+    TakingInsulin, Hospitalization, Measurement, DietaryIntake, TakingDiabetesTablet, PatientAdditionalDrug, \
+    PatientComorbidities
 
 
 class Repository:
@@ -12,53 +13,58 @@ class Repository:
         self.session = Session()
 
     def get_patients_td(self):  # td - train dataset
-        return (
+        res = (
             self.session
             .query(Patient)
             .join(DatasetPartition)
-            .filter(DatasetPartition.name == 'train')
+            # .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(Hospitalization.patient_id == Patient.id)
             )
             .all()
         )
 
+        return res
+
     def get_patient_drugs_map(self):
         query = (
             self.session
-            .query(Patient.id, AdditionalDrugs.id)
-            .join(AdditionalDrugs)
-            .join(DatasetPartition)
-            .filter(DatasetPartition.name == 'train')
+            .query(PatientAdditionalDrug.patient_id, PatientAdditionalDrug.drug_id)
+            .select_from(Patient)
+            .join(PatientAdditionalDrug, Patient.id == PatientAdditionalDrug.patient_id)
+            .join(DatasetPartition, Patient.dataset_partition_id == DatasetPartition.id)
+            # .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(Hospitalization.patient_id == Patient.id)
             )
+            .all()
         )
 
         mapping = {}
 
-        for pid, value in query:
-            mapping.setdefault(pid, []).append(value)
+        for pid, drug_id in query:
+            mapping.setdefault(pid, []).append(drug_id)
 
         return mapping
 
     def get_patient_comorbities_map(self):
         query = (
             self.session
-            .query(Patient.id, Comorbidities.id)
-            .join(Comorbidities)
-            .join(DatasetPartition)
-            .filter(DatasetPartition.name == 'train')
+            .query(PatientComorbidities.patient_id, PatientComorbidities.comorbidity_id)
+            .select_from(Patient)
+            .join(PatientComorbidities, Patient.id == PatientComorbidities.patient_id)
+            .join(DatasetPartition, Patient.dataset_partition_id == DatasetPartition.id)
+            #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(Hospitalization.patient_id == Patient.id)
             )
-
+            .all()
         )
 
         mapping = {}
 
-        for pid, value in query:
-            mapping.setdefault(pid, []).append(value)
+        for pid, comorb_id in query:
+            mapping.setdefault(pid, []).append(comorb_id)
 
         return mapping
 
@@ -67,7 +73,7 @@ class Repository:
             self.session.query(TakingInsulin)
             .join(TakingInsulin.patient)
             .join(Patient.dataset_partition)
-            .filter(DatasetPartition.name == 'train')
+            #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(
                     Hospitalization.patient_id == TakingInsulin.patient_id
@@ -81,10 +87,10 @@ class Repository:
             self.session.query(Measurement)
             .join(Measurement.patient)
             .join(Patient.dataset_partition)
-            .filter(DatasetPartition.name == 'train')
+            #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(
-                    Hospitalization.patient_id == TakingInsulin.patient_id
+                    Hospitalization.patient_id == Measurement.patient_id
                 )
             )
             .all()
@@ -95,10 +101,10 @@ class Repository:
             self.session
             .query(DietaryIntake)
             .join(DietaryIntake.patient)
-            .filter(DatasetPartition.name == 'train')
+            #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(
-                    Hospitalization.patient_id == TakingInsulin.patient_id
+                    Hospitalization.patient_id == DietaryIntake.patient_id
                 )
             )
             .all()
@@ -109,10 +115,10 @@ class Repository:
             self.session.query(TakingDiabetesTablet)
             .join(TakingDiabetesTablet.patient)
             .join(Patient.dataset_partition)
-            .filter(DatasetPartition.name == 'train')
+            #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(
-                    Hospitalization.patient_id == TakingInsulin.patient_id
+                    Hospitalization.patient_id == TakingDiabetesTablet.patient_id
                 )
             )
             .all()
@@ -149,5 +155,3 @@ class Repository:
 
 if __name__ == '__main__':
     rep = Repository()
-    insulin_list = rep.get_tablets_list()
-    print(insulin_list)

@@ -71,12 +71,12 @@ class GlucoseDataset(Dataset):
         food_intake = torch.tensor([window['food_intake_count']], dtype=torch.float32)
 
         y_insulin = torch.zeros(self.num_insulin, dtype=torch.float32)
-        for med_id, dose in window['insulin_doses_by_type'].items():
+        for med_id, dose in window['insulin_doses_by_type'].items() or {}:
             if 0 <= med_id < self.num_insulin:
                 y_insulin[med_id] = dose
 
         y_diabetes_tablet = torch.zeros(self.num_diabetes_tablets, dtype=torch.float32)
-        for med_id, dose in window['drug_tablets_by_type'].items():
+        for med_id, dose in window['drug_tablets_by_type'].items() or {}:
             if 0 <= med_id < self.num_diabetes_tablets:
                 y_diabetes_tablet[med_id] = dose
 
