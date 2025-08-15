@@ -2,9 +2,11 @@ import pandas as pd
 from sqlalchemy.orm import sessionmaker
 
 from db.engine import engine
-from db.models import Patient, PatientMedicalStatic, AdditionalDrugs, Comorbidities, \
+from db.models import Patient, PatientMedicalStatic, AdditionalDrug, Comorbidities, \
     DatasetPartition, DietaryIntake, Measurement, Insulin, DiabetesTablets, TakingInsulin, TakingDiabetesTablet, \
     Hospitalization
+from db.models.patient_additional_drug import PatientAdditionalDrug
+from db.models.patient_comorbidities import PatientComorbidities
 from utils.convert_python_format import to_python_format
 
 
@@ -129,11 +131,21 @@ class DataImporter:
 
                 if pd.notna(value) and str(value).strip() == '1':
                     drug_name = column_name.replace('has_', '').replace('_', ' ').title()
-                    drug = AdditionalDrugs(
+
+                    drug = self.session.query(AdditionalDrug).filter_by(name=drug_name).first()
+
+                    if not drug:
+                        drug = AdditionalDrug(name=drug_name)
+                        self.session.add(drug)
+                        self.session.flush()  # without final saving of the transaction
+
+                    link = PatientAdditionalDrug(
                         patient_id=str(patient_id),
-                        name=to_python_format(drug_name)
+                        drug_id=drug.id
                     )
-                    self.session.add(drug)
+
+                    self.session.add(link)
+
         except Exception as e:
             raise TypeError(f"[ERROR] import_additional_drugs for ID {patient_id}: {e}")
 
@@ -144,12 +156,21 @@ class DataImporter:
                 value = first_row.get(col_name)
 
                 if pd.notna(value) and str(value).strip() == '1':
-                    concomitant_name = col_name.replace('has_', '').replace('_', ' ').title()
-                    concomitant = Comorbidities(
+                    comorb_name = col_name.replace('has_', '').replace('_', ' ').title()
+
+                    comorbidity = self.session.query(Comorbidities).filter_by(name=comorb_name).first()
+
+                    if not comorbidity:
+                        comorbidity = Comorbidities(name=comorb_name)
+                        self.session.add(comorbidity)
+                        self.session.flush()
+
+                    link = PatientComorbidities(
                         patient_id=str(patient_id),
-                        name=to_python_format(concomitant_name)
+                        comorbidity_id=comorbidity.id
                     )
-                    self.session.add(concomitant)
+
+                    self.session.add(link)
         except Exception as e:
             raise TypeError(f"[ERROR] import_additional_drugs for ID {patient_id}: {e}")
 
@@ -267,10 +288,8 @@ class DataImporter:
         except Exception as e:
             raise TypeError(f'[ERROR] import_hospitalization for ID {patient_id}: {e}')
 
-
     def _import_therapy(self, patient_id, group):
         pass
-
 
     def _get_or_create_partition(self, partition_name: str):
         partition = self.session.query(DatasetPartition).filter_by(name=partition_name).first()
@@ -279,7 +298,6 @@ class DataImporter:
             self.session.add(partition)
             self.session.flush()  # get id before commit
         return partition
-
 
     def _get_or_create_insulin_id(self, name: str) -> int:
         insulin = self.session.query(Insulin).filter_by(name=name).first()
@@ -290,7 +308,6 @@ class DataImporter:
             self.session.flush()
 
         return insulin.id
-
 
     def _get_or_create_diabetes_tablet(self, name: str) -> int:
         diabetes_tablet = self.session.query(DiabetesTablets).filter_by(name=name).first()

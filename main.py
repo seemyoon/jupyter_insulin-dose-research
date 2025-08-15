@@ -28,7 +28,8 @@ class FullModel:
             unique_drugs,
             unique_comorbities,
             patient_to_drugs,
-            patient_to_comorbities)
+            patient_to_comorbities
+        )
 
         encoder = StaticEmbedderEncoder(
             static_dim=static_tensor.shape[1],
@@ -37,7 +38,6 @@ class FullModel:
             unique_comorbities_size=len(unique_comorbities),
             emb_dim=32,  # 32 - is default
             hidden_dim=64
-
         )
         output = encoder(static_tensor, drug_indices, comorb_indices)
 
@@ -69,23 +69,28 @@ class FullModel:
 
         model = DiabetesModel(static_dim=64, hidden_size=64, num_drug_types=num_drug_types, num_insulin_types=num_ins)
 
-        optimizer = Adam(model.parameters(),
-                         lr=1e-3)  # learning rate - 1e-3 = 0.001. This is how much the model changes its parameters after each training iteration.
+        optimizer = Adam(model.parameters(), lr=1e-3)
+        # learning rate - 1e-3 = 0.001. This is how much the model changes its parameters after each training iteration.
         mse = nn.MSELoss()
-
         model.train()
 
         for epoch in range(10):
             loss_store = 0
+
             for batch in data_loader:
-                dynamic, static, food_intake = batch['measurements'], batch['static'], batch['food_intake']
-                y_insulin, y_diabetes_tablet = batch['y_insulin'], batch['y_insulin']
+                y_insulin = batch['y_insulin']
+                y_diabetes_tablet = batch['y_diabetes_tablet']
 
                 optimizer.zero_grad()
-                pred_ins, pred_drug_tabl = model(dynamic, static, food_intake)
-                loss = mse(pred_ins, y_insulin) + mse(pred_drug_tabl, y_diabetes_tablet)
-                loss.backward()
+                pred_ins, pred_drug_tabl = model(batch['measurements'], batch['static'], batch['food_intake'])
+
+                loss_ins = mse(pred_ins, y_insulin)
+                loss_tab = mse(pred_drug_tabl, y_diabetes_tablet)
+                loss = loss_ins + loss_tab
+
+                loss.backward(retain_graph=True)
                 optimizer.step()
+
                 loss_store += loss.item()
             print(f'epoch {epoch:2d} loss={loss_store / len(data_loader):4f}')
 

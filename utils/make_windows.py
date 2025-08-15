@@ -1,6 +1,8 @@
+import json
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from training_model.repository import Repository
 from utils.enums.therapy_type import TherapyType
 
 
@@ -93,12 +95,16 @@ class MakeWindows:
                     current_period = next_period
                     continue
 
-                insulin_doses_by_type = self._sum_doses_by_type(insulin_w, 'dose', 'insulin_type')
-                drug_tablets_by_type = self._sum_doses_by_type(drug_tablets_w, 'dose', 'diabetes_tablet')
+                insulin_doses_by_type = self._sum_doses_by_type(insulin_w, 'dose', 'insulin') or {"0": 0.0}
+                drug_tablets_by_type = self._sum_doses_by_type(drug_tablets_w, 'dose', 'diabetes_tablet') or {"0": 0.0}
 
                 cgm_values = [record.cgm for record in meas_w if record.cgm is not None]
                 cbg_values = [record.cbg for record in meas_w if record.cbg is not None]
                 blood_ketones = [record.blood_ketone for record in meas_w if record.blood_ketone is not None]
+
+                cgm_values = [value for value in cgm_values if value != 0.0] or [0.0]
+                cbg_values = [value for value in cbg_values if value != 0.0] or [0.0]
+                blood_ketones = [value for value in blood_ketones if value != 0.0] or [0.0]
 
                 food_intake_count = len(food_intake_w)
 
@@ -116,8 +122,8 @@ class MakeWindows:
                     'patient_id': pat_id,
                     'window_start': current_period,
                     'window_end': next_period,
-                    'insulin_doses_by_type': insulin_doses_by_type or None,
-                    'drug_tablets_by_type': drug_tablets_by_type or None,
+                    'insulin_doses_by_type': insulin_doses_by_type,
+                    'drug_tablets_by_type': drug_tablets_by_type,
                     'cgm_values': cgm_values,
                     'cbg_values': cbg_values,
                     'blood_ketones': blood_ketones,
@@ -126,6 +132,9 @@ class MakeWindows:
                 })
 
                 current_period = next_period
+
+        # with open("windows_output_2.json", "w", encoding='utf-8') as f:
+        #     json.dump(windows, f, indent=4, default=str)
 
         return windows
 
@@ -158,3 +167,21 @@ class MakeWindows:
                 dict_grouped[med_id] += getattr(record, dose_attr, 0.0)
 
         return dict(dict_grouped)
+
+
+if __name__ == "__main__":
+    wind_download = MakeWindows()
+
+    repo = Repository()
+
+    insulin_val = repo.get_taking_insulin()
+    tablets_val = repo.get_taking_tablets()
+    meas = repo.get_measurements()
+    food_intake = repo.get_dietary()
+
+    wind_download.build_feature_windows(
+        insulin_val,
+        tablets_val,
+        meas,
+        food_intake
+    )

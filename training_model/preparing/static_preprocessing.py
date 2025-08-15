@@ -11,7 +11,7 @@ class StaticProcessing:
         returns a dictionary of {ID: index} for building embeddings.
 
         now if a patient has a drug with ID 12, we know that for the model this is index 2.
-        the model works with such indices (eg embedding(2)), not with the original IDs, which can be large and messy.
+        the model works with such indices (e.g. embedding(2)), not with the original IDs, which can be large and messy.
         """
         unique_ids = set(entity for entity_sublist in entity_list for entity in entity_sublist)  # {5, 12, 7}
         # return {entity_id: idx for idx, entity_id in enumerate(sorted(unique_ids))}  # {5: 0, 7: 1, 12: 2}
