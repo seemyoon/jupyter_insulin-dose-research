@@ -68,20 +68,6 @@ class Repository:
 
         return mapping
 
-    def get_taking_insulin(self):
-        return (
-            self.session.query(TakingInsulin)
-            .join(TakingInsulin.patient)
-            .join(Patient.dataset_partition)
-            #             .filter(DatasetPartition.name == 'train')
-            .filter(
-                ~exists().where(
-                    Hospitalization.patient_id == TakingInsulin.patient_id
-                )
-            )
-            .all()
-        )
-
     def get_measurements(self):
         return (
             self.session.query(Measurement)
@@ -119,6 +105,20 @@ class Repository:
             .filter(
                 ~exists().where(
                     Hospitalization.patient_id == TakingDiabetesTablet.patient_id
+                )
+            )
+            .all()
+        )
+
+    def get_taking_insulin(self):
+        return (
+            self.session.query(TakingInsulin)
+            .join(TakingInsulin.patient)
+            .join(Patient.dataset_partition)
+            #             .filter(DatasetPartition.name == 'train')
+            .filter(
+                ~exists().where(
+                    Hospitalization.patient_id == TakingInsulin.patient_id
                 )
             )
             .all()

@@ -12,7 +12,7 @@ def embed_and_pool(indices_lists, embedding_layer):
     :param embedding_layer: nn.Embedding layer that outputs a vector (e.g., length 8) for each ID.
     """
 
-    max_len = max(len(lst) for lst in indices_lists)  # Находит самую длинную строку (max_len = 3 в примере).
+    max_len = max(len(lst) for lst in indices_lists)
 
     padded = torch.zeros(
         (len(indices_lists), max_len),
