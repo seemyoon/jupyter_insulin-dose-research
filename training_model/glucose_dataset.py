@@ -23,6 +23,9 @@ class GlucoseDataset(Dataset):
         self.num_insulin = num_insulin
         self.num_diabetes_tablets = num_diabetes_tablets
 
+        self.max_insulin = max([dose for window in windows for dose in window['insulin_doses_by_type'].values()])
+        self.max_tablet = max([dose for window in windows for dose in window['drug_tablets_by_type'].values()])
+
     def __len__(self):
         return len(self.windows)
 
@@ -45,12 +48,12 @@ class GlucoseDataset(Dataset):
         y_insulin = torch.zeros(self.num_insulin, dtype=torch.float32)
         for med_id, dose in window['insulin_doses_by_type'].items():
             if 0 <= int(med_id) < self.num_insulin:
-                y_insulin[int(med_id)] = dose
+                y_insulin[int(med_id)] = dose / self.max_insulin
 
         y_diabetes_tablet = torch.zeros(self.num_diabetes_tablets, dtype=torch.float32)
         for med_id, dose in window['drug_tablets_by_type'].items():
             if 0 <= int(med_id) < self.num_diabetes_tablets:
-                y_diabetes_tablet[int(med_id)] = dose
+                y_diabetes_tablet[int(med_id)] = dose / self.max_tablet
 
         return {
             'measurements': measurements_with_tensors,

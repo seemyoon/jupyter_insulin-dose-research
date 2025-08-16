@@ -44,8 +44,8 @@ class StaticProcessing:
                 patient.age,
                 patient.height,
                 patient.weight,
-                patient.smoking_history,
-                patient.alcohol_drinking_history
+                patient.smoking_history or 0,
+                patient.alcohol_drinking_history or 0
             ]
 
             med = patient.medical_static
@@ -75,11 +75,11 @@ class StaticProcessing:
 
             drug_ids = patient_to_drugs.get(patient.id, [])
             drug_idx = [unique_drugs[drug_id] for drug_id in drug_ids if drug_id in unique_drugs]
-            drug_indices.append(drug_idx)
+            drug_indices.append(drug_idx or [0])
 
             comorb_ids = patient_to_comorbities.get(patient.id, [])
             comorb_idx = [unique_comorbities[comorb_id] for comorb_id in comorb_ids if comorb_id in unique_comorbities]
-            comorb_indices.append(comorb_idx)
+            comorb_indices.append(comorb_idx or [0])
 
         normalize_raw_static_features = StaticProcessing.normalize_features(raw_static_features)
         static_tensor = torch.tensor(normalize_raw_static_features, dtype=torch.float32)

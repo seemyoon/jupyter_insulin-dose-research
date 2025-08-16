@@ -2,6 +2,6 @@ from enum import Enum
 
 
 class TherapyType(Enum):
-    COMBINED = 0
-    INSULIN = 1
+    COMBINED = 1
+    INSULIN = 0
     TABLET = 2
