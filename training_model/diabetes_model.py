@@ -6,6 +6,8 @@ class DiabetesModel(nn.Module):
     def __init__(self, static_dim, hidden_size, num_insulin_types, num_drug_types):
         super().__init__()
         self.lstm = nn.LSTM(input_size=3, hidden_size=hidden_size, batch_first=True)
+        # self.gru = nn.GRU(input_size=3, hidden_size=hidden_size, batch_first=True)
+
         self.static_data = nn.Linear(static_dim, 32)
         self.food_intake = nn.Linear(1, 32)
 
@@ -20,6 +22,7 @@ class DiabetesModel(nn.Module):
     def forward(self, dynamic_data, static_data, food_intake):
         # dynamic_data: (B, T, 3)
         _, (h_n, _) = self.lstm(dynamic_data)
+        # _, h_n = self.gru(dynamic_data)
 
         # h_n shape: (num_layers, B, hidden_size)
         hidden = h_n[-1]  # (B, hidden_size) → 2D
@@ -31,3 +34,4 @@ class DiabetesModel(nn.Module):
         x = self.relu(self.combined_layers(x))  # (B, 64)
 
         return self.dose_insulin(x), self.dose_drug_tabletes(x)
+
