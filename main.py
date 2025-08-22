@@ -86,7 +86,7 @@ class FullModel:
 
                 loss_ins = mse(pred_ins, y_insulin)
                 loss_tab = mse(pred_drug_tabl, y_diabetes_tablet)
-                loss = loss_ins + loss_tab
+                loss = loss_tab + loss_ins
 
                 loss.backward(retain_graph=True)
                 optimizer.step()
