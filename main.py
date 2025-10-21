@@ -1,6 +1,7 @@
-from torch.utils.data import DataLoader
+from torch.utils.data import random_split, DataLoader
 from torch.optim import Adam
 import torch.nn as nn
+import torch
 
 from training_model.diabetes_model import DiabetesModel
 from training_model.glucose_dataset import GlucoseDataset
@@ -56,43 +57,131 @@ class FullModel:
 
         return MakeWindows().build_feature_windows(insulin_val, tablets_val, meas, food_intake)
 
-    def main(self):
+    def main(self, epochs=20, batch_size=32, lr=1e-3):
         static_dict = self.get_static_data()
         windows = self.get_dynamic_data()
 
-        # quantity uniques drugs
         num_ins = len(self.repo.get_insulin_list())
         num_drug_types = len(self.repo.get_tablets_list())
 
-        glucose_dataset = GlucoseDataset(windows, static_dict, num_ins, num_drug_types)
-        data_loader = DataLoader(glucose_dataset, batch_size=32, shuffle=True, collate_fn=GlucoseDataset.collate_fn)
+        full_dataset = GlucoseDataset(windows, static_dict, num_ins, num_drug_types)
+
+        # split: 80% train, 10% val, 10% test
+        n_total = len(full_dataset)
+        n_train = int(0.8 * n_total)
+        n_val = int(0.1 * n_total)
+        n_test = n_total - n_train - n_val
+
+        train_dataset, val_dataset, test_dataset = random_split(full_dataset, [n_train, n_val, n_test])
+
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                                  collate_fn=GlucoseDataset.collate_fn)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=GlucoseDataset.collate_fn)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
+                                 collate_fn=GlucoseDataset.collate_fn)
 
         model = DiabetesModel(static_dim=64, hidden_size=64, num_drug_types=num_drug_types, num_insulin_types=num_ins)
+        optimizer = Adam(model.parameters(), lr=lr)
+        mse_loss_fn = nn.MSELoss()
+        bce_loss_fn = nn.BCEWithLogitsLoss()
 
-        optimizer = Adam(model.parameters(), lr=1e-3)
-        # learning rate - 1e-3 = 0.001. This is how much the model changes its parameters after each training iteration.
-        mse = nn.MSELoss()
-        model.train()
+        best_val_loss = float('inf')
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.to(device)
 
-        for epoch in range(10):
-            loss_store = 0
+        for epoch in range(epochs):
+            # TRAIN
+            model.train()
+            train_mse_loss = 0
+            train_bce_loss = 0
 
-            for batch in data_loader:
-                y_insulin = batch['y_insulin']
-                y_diabetes_tablet = batch['y_diabetes_tablet']
-
+            for batch in train_loader:
                 optimizer.zero_grad()
-                pred_ins, pred_drug_tabl = model(batch['measurements'], batch['static'], batch['food_intake'])
 
-                loss_ins = mse(pred_ins, y_insulin)
-                loss_tab = mse(pred_drug_tabl, y_diabetes_tablet)
-                loss = loss_tab + loss_ins
+                measurements = batch['measurements'].to(device)
+                static = batch['static'].to(device)
+                food_intake = batch['food_intake'].to(device)
+
+                y_insulin = batch['y_insulin'].to(device)
+                y_tab = batch['y_diabetes_tablet'].to(device)
+                y_ins_mask = batch['y_insulin_mask'].to(device)
+                y_tab_mask = batch['y_diabetes_tablet_mask'].to(device)
+
+                pred_ins_dose, pred_tab_dose, pred_ins_mask, pred_tab_mask = model(measurements, static, food_intake)
+
+                mse_loss = mse_loss_fn(pred_ins_dose, y_insulin) + mse_loss_fn(pred_tab_dose, y_tab)
+                bce_loss = bce_loss_fn(pred_ins_mask, y_ins_mask) + bce_loss_fn(pred_tab_mask, y_tab_mask)
+                loss = mse_loss + bce_loss
 
                 loss.backward(retain_graph=True)
                 optimizer.step()
 
-                loss_store += loss.item()
-            print(f'epoch {epoch:2d} loss={loss_store / len(data_loader):4f}')
+                train_mse_loss += mse_loss.item()
+                train_bce_loss += bce_loss.item()
+
+            train_mse_loss /= len(train_loader)
+            train_bce_loss /= len(train_loader)
+
+            # VALIDATION
+            model.eval()
+            val_mse_loss = 0
+            val_bce_loss = 0
+            with torch.no_grad():
+                for batch in val_loader:
+                    measurements = batch['measurements'].to(device)
+                    static = batch['static'].to(device)
+                    food_intake = batch['food_intake'].to(device)
+
+                    y_insulin = batch['y_insulin'].to(device)
+                    y_tab = batch['y_diabetes_tablet'].to(device)
+                    y_ins_mask = batch['y_insulin_mask'].to(device)
+                    y_tab_mask = batch['y_diabetes_tablet_mask'].to(device)
+
+                    pred_ins_dose, pred_tab_dose, pred_ins_mask, pred_tab_mask = model(measurements, static,
+                                                                                       food_intake)
+
+                    val_mse_loss += mse_loss_fn(pred_ins_dose, y_insulin).item() + mse_loss_fn(pred_tab_dose,
+                                                                                               y_tab).item()
+                    val_bce_loss += bce_loss_fn(pred_ins_mask, y_ins_mask).item() + bce_loss_fn(pred_tab_mask,
+                                                                                                y_tab_mask).item()
+
+            val_mse_loss /= len(val_loader)
+            val_bce_loss /= len(val_loader)
+            val_total_loss = val_mse_loss + val_bce_loss
+
+            # save best model
+            if val_total_loss < best_val_loss:
+                best_val_loss = val_total_loss
+                torch.save(model.state_dict(), 'best_model_gru.pth')
+
+            print(f"Epoch {epoch:2d} | Train MSE: {train_mse_loss:.4f}, Train BCE: {train_bce_loss:.4f} | "
+                  f"Val MSE: {val_mse_loss:.4f}, Val BCE: {val_bce_loss:.4f}")
+
+        # TEST
+        model.load_state_dict(torch.load('best_model_gru.pth'))
+        model.eval()
+        test_mse_loss = 0
+        test_bce_loss = 0
+        with torch.no_grad():
+            for batch in test_loader:
+                measurements = batch['measurements'].to(device)
+                static = batch['static'].to(device)
+                food_intake = batch['food_intake'].to(device)
+
+                y_insulin = batch['y_insulin'].to(device)
+                y_tab = batch['y_diabetes_tablet'].to(device)
+                y_ins_mask = batch['y_insulin_mask'].to(device)
+                y_tab_mask = batch['y_diabetes_tablet_mask'].to(device)
+
+                pred_ins_dose, pred_tab_dose, pred_ins_mask, pred_tab_mask = model(measurements, static, food_intake)
+
+                test_mse_loss += mse_loss_fn(pred_ins_dose, y_insulin).item() + mse_loss_fn(pred_tab_dose, y_tab).item()
+                test_bce_loss += bce_loss_fn(pred_ins_mask, y_ins_mask).item() + bce_loss_fn(pred_tab_mask,
+                                                                                             y_tab_mask).item()
+
+        test_mse_loss /= len(test_loader)
+        test_bce_loss /= len(test_loader)
+        print(f"Test MSE: {test_mse_loss:.4f}, Test BCE: {test_bce_loss:.4f}")
 
 
 if __name__ == '__main__':

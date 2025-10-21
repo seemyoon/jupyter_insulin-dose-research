@@ -55,12 +55,17 @@ class GlucoseDataset(Dataset):
             if 0 <= int(med_id) < self.num_diabetes_tablets:
                 y_diabetes_tablet[int(med_id)] = dose / self.max_tablet
 
+        y_insulin_mask = (y_insulin > 0).float()
+        y_diabetes_tablet_mask = (y_diabetes_tablet > 0).float()
+
         return {
             'measurements': measurements_with_tensors,
             'static': static,
             'food_intake': food_intake,
             'y_insulin': y_insulin,
-            'y_diabetes_tablet': y_diabetes_tablet
+            'y_diabetes_tablet': y_diabetes_tablet,
+            'y_insulin_mask': y_insulin_mask,
+            'y_diabetes_tablet_mask': y_diabetes_tablet_mask,
         }
 
     @staticmethod
@@ -80,11 +85,15 @@ class GlucoseDataset(Dataset):
         food_intake = torch.stack([x['food_intake'] for x in batch])
         y_insulin = torch.stack([x['y_insulin'] for x in batch])
         y_diabetes_tablet = torch.stack([x['y_diabetes_tablet'] for x in batch])
+        y_insulin_mask = torch.stack([x['y_insulin_mask'] for x in batch])
+        y_diabetes_tablet_mask = torch.stack([x['y_diabetes_tablet_mask'] for x in batch])
 
         return {
             'measurements': measurements_pad,
             'static': statics,
             'food_intake': food_intake,
             'y_insulin': y_insulin,
-            'y_diabetes_tablet': y_diabetes_tablet
+            'y_diabetes_tablet': y_diabetes_tablet,
+            'y_insulin_mask': y_insulin_mask,
+            'y_diabetes_tablet_mask': y_diabetes_tablet_mask,
         }
