@@ -6,7 +6,6 @@ from .diabetes_tablet import DiabetesTablets
 from .taking_diabetes_tablet import TakingDiabetesTablet
 from .additional_drug import AdditionalDrug
 from .comorbidities import Comorbidities
-from .dataset_partition import DatasetPartition
 from .measurement import Measurement
 from .dietary_intake import DietaryIntake
 from .hospitalization import Hospitalization
@@ -24,7 +23,6 @@ __all__ = [
     "Comorbidities",
     "PatientAdditionalDrug",
     "PatientComorbidities",
-    "DatasetPartition",
     'Measurement',
     'DietaryIntake',
     'Hospitalization'

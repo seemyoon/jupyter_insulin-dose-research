@@ -2,8 +2,8 @@ import pandas as pd
 from sqlalchemy.orm import sessionmaker
 
 from db.engine import engine
-from db.models import Patient, PatientMedicalStatic, AdditionalDrug, Comorbidities, \
-    DatasetPartition, DietaryIntake, Measurement, Insulin, DiabetesTablets, TakingInsulin, TakingDiabetesTablet, \
+from db.models import Patient, PatientMedicalStatic, AdditionalDrug, Comorbidities, DietaryIntake, Measurement, Insulin, \
+    DiabetesTablets, TakingInsulin, TakingDiabetesTablet, \
     Hospitalization
 from db.models.patient_additional_drug import PatientAdditionalDrug
 from db.models.patient_comorbidities import PatientComorbidities
@@ -11,11 +11,10 @@ from utils.convert_python_format import to_python_format
 
 
 class DataImporter:
-    def __init__(self, partition_name: str):
+    def __init__(self):
         Session = sessionmaker(
             bind=engine)  # creates a session factory class that knows what engine it is connecting to.
         self.session = Session()  # start a new session (connection to the database) with which we work.
-        self.partition = self._get_or_create_partition(partition_name)
 
     additional_drug_columns = [
         "has_ace_inhibitors", "has_angioprotectors", "has_antianginal", "has_antiarrhythmic",
@@ -91,7 +90,6 @@ class DataImporter:
                 smoking_history=to_python_format(first_row.get('Smoking History (pack year)')),
                 alcohol_drinking_history=to_python_format(
                     first_row.get('Alcohol Drinking History (drinker/non-drinker)')),
-                dataset_partition_id=to_python_format(self.partition.id)
             )
             self.session.add(patient)
         except Exception as e:
@@ -290,14 +288,6 @@ class DataImporter:
 
     def _import_therapy(self, patient_id, group):
         pass
-
-    def _get_or_create_partition(self, partition_name: str):
-        partition = self.session.query(DatasetPartition).filter_by(name=partition_name).first()
-        if not partition:
-            partition = DatasetPartition(name=partition_name)
-            self.session.add(partition)
-            self.session.flush()  # get id before commit
-        return partition
 
     def _get_or_create_insulin_id(self, name: str) -> int:
         insulin = self.session.query(Insulin).filter_by(name=name).first()

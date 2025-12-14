@@ -41,7 +41,7 @@ class DfShanghaiTimeSeries:
                     print(f'error reading {file}: {e}')
 
         if not all_data:
-            print("no full_data loaded")
+            print("no data loaded")
             return None
 
         combined_df = pd.concat(all_data, ignore_index=True)

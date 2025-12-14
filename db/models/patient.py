@@ -8,9 +8,6 @@ class Patient(Base):
     __tablename__ = 'patient'
 
     id = Column(String, primary_key=True, nullable=False)
-    dataset_partition_id = Column(Integer, ForeignKey("dataset_partition.id"), nullable=False)
-
-    dataset_partition = relationship("DatasetPartition", back_populates="patients")
 
     insulins = relationship("TakingInsulin", back_populates="patient")
     tablets = relationship("TakingDiabetesTablet", back_populates="patient")

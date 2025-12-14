@@ -22,7 +22,7 @@ def split_dataset(df: pd.DataFrame, test_ids):
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-FILE_PATH = os.path.join(CURRENT_DIR, '..', 'cleaned_data', 'finish_data.csv')
+FILE_PATH = os.path.join(CURRENT_DIR, '..', 'data', 'finish_data.csv')
 
 print("File exists?", os.path.exists(FILE_PATH))
 df = pd.read_csv(FILE_PATH)
@@ -36,4 +36,4 @@ test_ids = ['1011_0_20210622', '1009_0_20210803', '1012_0_20210923', '1010_0_202
 train_df, test_df = split_dataset(df, test_ids)
 
 train_df.to_csv('train_data.csv', index=False)
-test_df.to_csv('test_data.csv', index=False)
+test_df.to_csv('Shanghai_data.csv', index=False)

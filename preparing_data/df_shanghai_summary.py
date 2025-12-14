@@ -50,7 +50,7 @@ class DiabetesDataPreprocessor:
         return self
 
     def clean_data(self):
-        """Remove outliers and fix full_data errors"""
+        """Remove outliers and fix data errors"""
         self.df = self.df[self.df['Fasting Insulin (pmol/L)'] < 700]
         self.df = self.df[self.df['2-hour Postprandial Insulin (pmol/L)'] < 800]
 
@@ -348,9 +348,9 @@ class DiabetesFeatureEngineer:
 def main():
     # Initialize preprocessor
     print(os.getcwd())
-    preprocessor = DiabetesDataPreprocessor('../full_data/Shanghai_diabetes_datasets/clinical_info/csv')
+    preprocessor = DiabetesDataPreprocessor('../data/Shanghai_diabetes_datasets/clinical_info/csv')
 
-    # Load and process full_data
+    # Load and process data
     df = (preprocessor
           .load_and_combine_data()
           .handle_missing_values()
