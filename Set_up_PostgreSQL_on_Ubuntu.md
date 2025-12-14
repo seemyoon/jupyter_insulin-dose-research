@@ -83,10 +83,10 @@ Switch to your database
 Grant the missing privileges (THIS is the key)
 ```
 -- allow using the schema
-GRANT USAGE ON SCHEMA public TO semyon;
+GRANT USAGE ON SCHEMA public TO myuser;
 
 -- allow creating tables
-GRANT CREATE ON SCHEMA public TO semyon;
+GRANT CREATE ON SCHEMA public TO myuser;
 ```
 6. Test connection
 ```
