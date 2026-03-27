@@ -2,7 +2,7 @@ from sqlalchemy import exists
 from sqlalchemy.orm import sessionmaker
 
 from db.engine import engine
-from db.models import Patient, DatasetPartition, Insulin, DiabetesTablets, \
+from db.models import Patient, Insulin, DiabetesTablets, \
     TakingInsulin, Hospitalization, Measurement, DietaryIntake, TakingDiabetesTablet, PatientAdditionalDrug, \
     PatientComorbidities
 
@@ -16,7 +16,6 @@ class Repository:
         res = (
             self.session
             .query(Patient)
-            .join(DatasetPartition)
             # .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(Hospitalization.patient_id == Patient.id)
@@ -32,7 +31,6 @@ class Repository:
             .query(PatientAdditionalDrug.patient_id, PatientAdditionalDrug.drug_id)
             .select_from(Patient)
             .join(PatientAdditionalDrug, Patient.id == PatientAdditionalDrug.patient_id)
-            .join(DatasetPartition, Patient.dataset_partition_id == DatasetPartition.id)
             # .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(Hospitalization.patient_id == Patient.id)
@@ -53,7 +51,6 @@ class Repository:
             .query(PatientComorbidities.patient_id, PatientComorbidities.comorbidity_id)
             .select_from(Patient)
             .join(PatientComorbidities, Patient.id == PatientComorbidities.patient_id)
-            .join(DatasetPartition, Patient.dataset_partition_id == DatasetPartition.id)
             #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(Hospitalization.patient_id == Patient.id)
@@ -72,8 +69,6 @@ class Repository:
         return (
             self.session.query(Measurement)
             .join(Measurement.patient)
-            .join(Patient.dataset_partition)
-            #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(
                     Hospitalization.patient_id == Measurement.patient_id
@@ -100,8 +95,6 @@ class Repository:
         return (
             self.session.query(TakingDiabetesTablet)
             .join(TakingDiabetesTablet.patient)
-            .join(Patient.dataset_partition)
-            #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(
                     Hospitalization.patient_id == TakingDiabetesTablet.patient_id
@@ -114,8 +107,6 @@ class Repository:
         return (
             self.session.query(TakingInsulin)
             .join(TakingInsulin.patient)
-            .join(Patient.dataset_partition)
-            #             .filter(DatasetPartition.name == 'train')
             .filter(
                 ~exists().where(
                     Hospitalization.patient_id == TakingInsulin.patient_id

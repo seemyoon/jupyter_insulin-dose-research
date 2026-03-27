@@ -1,0 +1,11 @@
+torch>=2.0
+numpy
+pandas
+scikit-learn
+sqlalchemy
+psycopg2-binary
+alembic
+python-dotenv
+optuna
+xgboost
+streamlit

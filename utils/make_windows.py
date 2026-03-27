@@ -108,14 +108,15 @@ class MakeWindows:
 
                 food_intake_count = len(food_intake_w)
 
-                therapy_type = None
-                # combined - 1; insulin - 0; tablet - 2
+                has_insulin = len(insulin_w) > 0
+                has_tablets = len(drug_tablets_w) > 0
 
-                if insulin_doses_by_type and drug_tablets_by_type:
+                therapy_type = None
+                if has_insulin and has_tablets:
                     therapy_type = TherapyType.COMBINED
-                elif insulin_doses_by_type:
+                elif has_insulin:
                     therapy_type = TherapyType.INSULIN
-                elif drug_tablets_by_type:
+                elif has_tablets:
                     therapy_type = TherapyType.TABLET
 
                 windows.append({
@@ -128,7 +129,7 @@ class MakeWindows:
                     'cbg_values': cbg_values,
                     'blood_ketones': blood_ketones,
                     'food_intake_count': food_intake_count,
-                    'therapy_type': therapy_type.value,
+                    'therapy_type': therapy_type.value if therapy_type is not None else None,
                 })
 
                 current_period = next_period
