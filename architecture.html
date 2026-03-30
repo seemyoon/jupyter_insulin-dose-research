@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insulin Dose Prediction — Architecture</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --orange: #d29922; --red: #f85149;
+    --purple: #bc8cff; --teal: #39d353;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; padding: 2rem; line-height: 1.5; }
+  h1 { text-align: center; margin-bottom: .3rem; color: #fff; font-size: 1.8rem; }
+  .subtitle { text-align: center; color: var(--muted); margin-bottom: 2rem; }
+  h2 { color: var(--accent); margin: 2rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: .4rem; font-size: 1.3rem; }
+  h3 { color: var(--purple); margin: 1.2rem 0 .5rem; font-size: 1.05rem; }
+
+  .grid { display: grid; gap: 1rem; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.2rem; }
+  .card-title { font-weight: 600; color: #fff; margin-bottom: .4rem; font-size: .95rem; }
+  .card ul { list-style: none; padding: 0; }
+  .card li { padding: .15rem 0; color: var(--muted); font-size: .85rem; }
+  .card li code { color: var(--green); background: rgba(56,139,253,.1); padding: .1rem .35rem; border-radius: 3px; font-size: .82rem; }
+  .card li .arrow { color: var(--orange); margin: 0 .3rem; }
+
+  .flow { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+  .flow-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .5rem 1rem; text-align: center; font-size: .85rem; min-width: 100px; }
+  .flow-box.db { border-color: var(--accent); color: var(--accent); }
+  .flow-box.proc { border-color: var(--green); color: var(--green); }
+  .flow-box.model { border-color: var(--purple); color: var(--purple); }
+  .flow-box.out { border-color: var(--orange); color: var(--orange); }
+  .flow-box.app { border-color: var(--teal); color: var(--teal); }
+  .flow-arrow { color: var(--muted); font-size: 1.2rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: .5rem 0; font-size: .82rem; }
+  th { text-align: left; color: var(--accent); border-bottom: 1px solid var(--border); padding: .4rem .6rem; }
+  td { padding: .35rem .6rem; border-bottom: 1px solid rgba(48,54,61,.5); color: var(--muted); }
+  td code { color: var(--green); }
+
+  .tag { display: inline-block; padding: .1rem .45rem; border-radius: 3px; font-size: .72rem; font-weight: 600; margin-left: .4rem; }
+  .tag-cls { background: rgba(188,140,255,.15); color: var(--purple); }
+  .tag-reg { background: rgba(63,185,80,.15); color: var(--green); }
+  .tag-both { background: rgba(210,153,34,.15); color: var(--orange); }
+
+  .nn-diagram { display: flex; align-items: stretch; gap: .4rem; margin: 1rem 0; overflow-x: auto; padding: .5rem 0; }
+  .nn-col { display: flex; flex-direction: column; align-items: center; gap: .3rem; min-width: 110px; }
+  .nn-label { font-size: .7rem; color: var(--muted); text-align: center; }
+  .nn-block { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: .4rem .6rem; font-size: .78rem; text-align: center; width: 100%; }
+  .nn-block.rnn { border-color: var(--purple); color: var(--purple); }
+  .nn-block.static { border-color: var(--accent); color: var(--accent); }
+  .nn-block.aux { border-color: var(--teal); color: var(--teal); }
+  .nn-block.head { border-color: var(--orange); color: var(--orange); }
+  .nn-block.xgb { border-color: var(--red); color: var(--red); }
+  .nn-merge { font-size: 1.1rem; color: var(--muted); display: flex; align-items: center; }
+
+  .file-tree { font-family: 'SFMono-Regular', Consolas, monospace; font-size: .82rem; color: var(--muted); }
+  .file-tree .dir { color: var(--accent); }
+  .file-tree .file { color: var(--text); }
+  .file-tree .desc { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>Insulin Dose Prediction</h1>
+<p class="subtitle">Multi-task deep learning for drug selection + dose regression</p>
+
+<!-- ============================================================ -->
+<h2>1. High-Level Data Flow</h2>
+
+<div class="flow">
+  <div class="flow-box db">PostgreSQL<br><small>Patient data</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-box proc">Repository<br><small>ORM queries</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-box proc">MakeWindows<br><small>24h windows</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-box proc">StaticProcessing<br><small>Normalize + embed</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-box proc">GlucoseDataset<br><small>PyTorch Dataset</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-box model">DiabetesModel<br><small>GRU/LSTM/Hybrid</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-box out">Predictions<br><small>Drugs + Doses</small></div>
+</div>
+
+<div class="flow">
+  <div class="flow-box app">app.py<br><small>Training UI</small></div>
+  <span class="flow-arrow">&harr;</span>
+  <div class="flow-box proc">main.py<br><small>FullModel pipeline</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-box out">checkpoint.pt</div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-box app">predict_app.py<br><small>Inference UI</small></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>2. Neural Network Architecture (DiabetesModel)</h2>
+
+<div class="nn-diagram">
+  <div class="nn-col">
+    <div class="nn-label">Inputs</div>
+    <div class="nn-block rnn">Measurements<br><small>(B, T, 3)</small><br><small>CGM, CBG, Ketone</small></div>
+    <div class="nn-block static">Static Features<br><small>(B, 24)</small></div>
+    <div class="nn-block static">Drug IDs<br><small>(B, D)</small></div>
+    <div class="nn-block static">Comorb IDs<br><small>(B, C)</small></div>
+    <div class="nn-block aux">Food Intake<br><small>(B, 1)</small></div>
+    <div class="nn-block aux">Therapy Type<br><small>(B, 3) one-hot</small></div>
+    <div class="nn-block xgb">XGB Preds<br><small>(B, K) hybrid only</small></div>
+  </div>
+
+  <span class="nn-merge">&rarr;</span>
+
+  <div class="nn-col">
+    <div class="nn-label">Encoders</div>
+    <div class="nn-block rnn">GRU / LSTM<br><small>num_layers, hidden_size</small><br><small>&rarr; h_n[-1]</small></div>
+    <div class="nn-block static">StaticEmbedderEncoder<br><small>Embed drugs + comorbs</small><br><small>MLP &rarr; static_hidden</small></div>
+    <div class="nn-block aux">Linear(1 &rarr; 16)<br><small>food aux</small></div>
+    <div class="nn-block aux">Linear(3 &rarr; 16)<br><small>therapy aux</small></div>
+  </div>
+
+  <span class="nn-merge">&rarr;</span>
+
+  <div class="nn-col">
+    <div class="nn-label">Fusion</div>
+    <div class="nn-block" style="border-color: #fff; color: #fff; min-height: 160px; display: flex; align-items: center; justify-content: center;">
+      torch.cat([ ])<br>
+      <small>RNN hidden</small><br>
+      <small>+ static encoded</small><br>
+      <small>+ food + therapy</small><br>
+      <small>+ XGB preds (hybrid)</small><br><br>
+      <small>&darr;</small><br>
+      <small>Linear &rarr; ReLU &rarr; Dropout</small>
+    </div>
+  </div>
+
+  <span class="nn-merge">&rarr;</span>
+
+  <div class="nn-col">
+    <div class="nn-label">Output Heads</div>
+    <div class="nn-block head">dose_insulin<br><small>Linear &rarr; (B, N_ins)</small><br><span class="tag tag-reg">REGRESSION</span></div>
+    <div class="nn-block head">dose_tablets<br><small>Linear &rarr; (B, N_tab)</small><br><span class="tag tag-reg">REGRESSION</span></div>
+    <div class="nn-block head">insulin_mask<br><small>Linear &rarr; (B, N_ins)</small><br><span class="tag tag-cls">CLASSIFICATION</span></div>
+    <div class="nn-block head">tablet_mask<br><small>Linear &rarr; (B, N_tab)</small><br><span class="tag tag-cls">CLASSIFICATION</span></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>3. Multi-Task Loss</h2>
+
+<div class="card" style="max-width: 700px; margin: 0 auto;">
+  <div class="card-title">Loss = MSE<sub>masked</sub> + bce_weight &times; BCE<sub>weighted</sub></div>
+  <ul>
+    <li><code>masked_mse</code> — MSE only on drug slots where ground-truth dose &gt; 0 <span class="tag tag-reg">REGRESSION</span></li>
+    <li><code>BCEWithLogitsLoss(pos_weight=...)</code> — per-drug-type class weighting (neg/pos ratio, cap=15) <span class="tag tag-cls">CLASSIFICATION</span></li>
+    <li><code>bce_weight</code> — fixed scalar (default 1.0) balancing the two tasks <span class="tag tag-both">BALANCE</span></li>
+  </ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>4. Database Schema (PostgreSQL)</h2>
+
+<div class="grid grid-3">
+  <div class="card">
+    <div class="card-title">patient</div>
+    <ul>
+      <li><code>id</code> String PK</li>
+      <li><code>gender</code> <code>age</code> Int</li>
+      <li><code>height</code> <code>weight</code> Float</li>
+      <li><code>smoking_history</code> <code>alcohol_drinking_history</code> Int</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">medical_static</div>
+    <ul>
+      <li><code>patient_id</code> FK &rarr; patient</li>
+      <li><code>diabetes_type</code> Int</li>
+      <li><code>diabetes_duration_years</code> Float</li>
+      <li>18 lab values: <code>fasting_glucose</code>, <code>hba1c</code>, <code>egfr</code>, etc.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">measurement</div>
+    <ul>
+      <li><code>patient_id</code> FK &rarr; patient</li>
+      <li><code>year</code> <code>month</code> <code>day</code> <code>hour</code> <code>minute</code></li>
+      <li><code>cgm</code> <code>cbg</code> <code>blood_ketone</code> Float</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">insulin / taking_insulin</div>
+    <ul>
+      <li><code>insulin</code>: <code>id</code>, <code>name</code></li>
+      <li><code>taking_insulin</code>: patient_id, insulin_id, time, <code>dose</code></li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">diabetes_tablet / taking_diabetes_tablet</div>
+    <ul>
+      <li><code>diabetes_tablet</code>: <code>id</code>, <code>name</code></li>
+      <li><code>taking_diabetes_tablet</code>: patient_id, tablet_id, time, <code>dose</code></li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">additional_drug / comorbidities</div>
+    <ul>
+      <li><code>additional_drug</code>: <code>id</code>, <code>name</code></li>
+      <li><code>comorbidities</code>: <code>id</code>, <code>name</code></li>
+      <li>Linked via <code>patient_additional_drug</code>, <code>patient_comorbidities</code></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>5. Project File Structure</h2>
+
+<div class="card">
+<pre class="file-tree">
+<span class="dir">jupyter_insulin-dose-research/</span>
+├── <span class="file">main.py</span>              <span class="desc">— FullModel: DB load, train/eval, Optuna/Grid search, checkpoint</span>
+├── <span class="file">app.py</span>               <span class="desc">— Streamlit training UI (configure, train, compare runs)</span>
+├── <span class="file">predict_app.py</span>       <span class="desc">— Streamlit inference UI (enter patient data → drug/dose output)</span>
+├── <span class="file">requirements.txt</span>     <span class="desc">— Python dependencies</span>
+│
+├── <span class="dir">training_model/</span>
+│   ├── <span class="file">diabetes_model.py</span>           <span class="desc">— DiabetesModel (GRU / LSTM / Hybrid XGBoost+LSTM)</span>
+│   ├── <span class="file">glucose_dataset.py</span>          <span class="desc">— GlucoseDataset: window → tensors + collate_fn</span>
+│   ├── <span class="file">repository.py</span>               <span class="desc">— Repository: SQLAlchemy queries for all patient data</span>
+│   ├── <span class="file">xgboost_baseline.py</span>         <span class="desc">— XGBoostBaseline: static features → dose profile</span>
+│   └── <span class="dir">preparing/</span>
+│       ├── <span class="file">static_preprocessing.py</span>  <span class="desc">— StaticProcessing: scaler, embeddings, static_dict</span>
+│       └── <span class="file">static_embedding_encoder.py</span> <span class="desc">— StaticEmbedderEncoder: nn.Module for drug/comorb embeddings</span>
+│
+├── <span class="dir">utils/</span>
+│   ├── <span class="file">make_windows.py</span>       <span class="desc">— MakeWindows: 24h sliding windows from ORM records</span>
+│   ├── <span class="file">split_dataset.py</span>      <span class="desc">— Train/test split by patient ID</span>
+│   ├── <span class="file">to_datetime.py</span>        <span class="desc">— to_dt: time fields → datetime</span>
+│   ├── <span class="file">convert_python_format.py</span> <span class="desc">— Clean NaN/numpy for DB insertion</span>
+│   ├── <span class="file">embed_and_pool.py</span>     <span class="desc">— Standalone embed & pool utility</span>
+│   └── <span class="dir">enums/</span>
+│       └── <span class="file">therapy_type.py</span>   <span class="desc">— TherapyType enum (INSULIN, COMBINED, TABLET)</span>
+│
+├── <span class="dir">db/</span>
+│   ├── <span class="file">engine.py</span>             <span class="desc">— PostgreSQL connection with .env config</span>
+│   ├── <span class="file">base.py</span>               <span class="desc">— SQLAlchemy declarative Base</span>
+│   ├── <span class="file">create_tables.py</span>      <span class="desc">— Run metadata.create_all()</span>
+│   └── <span class="dir">models/</span>              <span class="desc">— 13 ORM models (Patient, Insulin, Measurement, ...)</span>
+│
+├── <span class="dir">preparing_data/</span>
+│   ├── <span class="file">df_full_data.py</span>       <span class="desc">— Merge time-series + summary CSVs</span>
+│   ├── <span class="file">df_shanghai_summary.py</span> <span class="desc">— Shanghai summary ETL</span>
+│   └── <span class="file">df_shanghai_time_series.py</span> <span class="desc">— Shanghai time-series loader</span>
+│
+├── <span class="file">load_data_controller.py</span>   <span class="desc">— CLI entry for CSV → DB import</span>
+├── <span class="file">load_data_to_db.py</span>        <span class="desc">— DataImporter: CSV rows → ORM inserts</span>
+│
+├── <span class="dir">data/</span>                    <span class="desc">— Raw CSV datasets</span>
+├── <span class="dir">alembic/</span>                 <span class="desc">— DB migration scripts</span>
+└── <span class="dir">windows_result_output/</span>   <span class="desc">— Debug output for windowing</span>
+</pre>
+</div>
+
+<!-- ============================================================ -->
+<h2>6. Training Pipeline Details</h2>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title">Data Preparation</div>
+    <ul>
+      <li><code>Repository</code> <span class="arrow">&rarr;</span> raw ORM records (non-hospitalized patients)</li>
+      <li><code>MakeWindows</code> <span class="arrow">&rarr;</span> 24h sliding windows with CGM, CBG, ketone, food, doses</li>
+      <li><code>split_by_patient()</code> <span class="arrow">&rarr;</span> patient-level train 80% / val 10% / test 10%</li>
+      <li><code>MinMaxScaler</code> fitted on training patients only (no leakage)</li>
+      <li>Measurement z-score normalization from training stats</li>
+      <li>Dose normalization: <code>dose / max_dose_from_train</code></li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">Hyperparameter Search</div>
+    <ul>
+      <li><strong>Optuna</strong> (Bayesian): hidden_size, num_rnn_layers, dropout, lr, batch_size, emb_dim</li>
+      <li><strong>Grid Search</strong>: hidden_size, dropout, lr, batch_size</li>
+      <li>Early stopping with configurable patience</li>
+      <li>Reproducible via <code>set_seed(42)</code></li>
+      <li>Pruning via <code>MedianPruner</code></li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">Classification Metrics (Drug Selection)</div>
+    <ul>
+      <li><strong>Precision</strong> — of predicted drugs, how many are correct?</li>
+      <li><strong>Recall</strong> — of actual drugs, how many are found?</li>
+      <li><strong>F1</strong> — harmonic mean (main classification metric)</li>
+      <li><strong>Exact Match</strong> — windows where all drug slots are correct</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title">Regression Metrics (Dose Accuracy)</div>
+    <ul>
+      <li><strong>R&sup2;</strong> — coefficient of determination (1.0 = perfect, &lt; 0 = worse than mean)</li>
+      <li><strong>MAE</strong> — mean absolute error (normalized dose units)</li>
+      <li>Both computed only on active drug slots (where drug is prescribed)</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>7. Model Variants</h2>
+
+<div class="grid grid-3">
+  <div class="card">
+    <div class="card-title" style="color: var(--purple);">GRU</div>
+    <ul>
+      <li>GRU encoder for time-series</li>
+      <li>Fast training, fewer parameters</li>
+      <li>Good baseline for short sequences</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title" style="color: var(--accent);">LSTM</div>
+    <ul>
+      <li>LSTM encoder (separate cell state)</li>
+      <li>Better long-range memory</li>
+      <li>Slightly more parameters than GRU</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title" style="color: var(--red);">Hybrid XGBoost + LSTM</div>
+    <ul>
+      <li>Stage 1: XGBoost learns dose baseline from static features</li>
+      <li>Stage 2: LSTM refines with temporal patterns</li>
+      <li>XGB predictions injected into fusion layer</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>8. Applications</h2>
+
+<div class="grid grid-2">
+  <div class="card">
+    <div class="card-title" style="color: var(--teal);">app.py — Training UI</div>
+    <ul>
+      <li><code>streamlit run app.py</code></li>
+      <li>Select model type, search method, hyperparams</li>
+      <li>Live training progress with metrics table</li>
+      <li>Test-set evaluation with classification + regression metrics</li>
+      <li>Run history comparison across experiments</li>
+      <li>Saves <code>checkpoint.pt</code> for inference</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-title" style="color: var(--teal);">predict_app.py — Inference UI</div>
+    <ul>
+      <li><code>streamlit run predict_app.py</code></li>
+      <li>Loads <code>checkpoint.pt</code> (no DB needed)</li>
+      <li>Enter patient demographics, medical data, measurements</li>
+      <li>Select additional drugs and comorbidities</li>
+      <li>Output: therapy type + drug names + doses + confidence</li>
+      <li>Adjustable decision threshold</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

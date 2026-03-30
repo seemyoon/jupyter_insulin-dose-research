@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from db.engine import engine
 from db.models import Patient, Insulin, DiabetesTablets, \
     TakingInsulin, Hospitalization, Measurement, DietaryIntake, TakingDiabetesTablet, PatientAdditionalDrug, \
-    PatientComorbidities
+    PatientComorbidities, AdditionalDrug, Comorbidities
 
 
 class Repository:
@@ -142,6 +142,15 @@ class Repository:
                 mapping[pid] = value
 
         return mapping
+
+
+    def get_additional_drugs_list(self):
+        query = self.session.query(AdditionalDrug.id, AdditionalDrug.name).all()
+        return {row[0]: row[1] for row in query}
+
+    def get_comorbidities_list(self):
+        query = self.session.query(Comorbidities.id, Comorbidities.name).all()
+        return {row[0]: row[1] for row in query}
 
 
 if __name__ == '__main__':

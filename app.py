@@ -9,7 +9,6 @@ import time
 from datetime import datetime
 from itertools import product
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 import torch
@@ -91,6 +90,15 @@ n_trials = st.sidebar.slider(
 epochs = st.sidebar.slider("Max epochs per trial", 10, 150, 30)
 patience = st.sidebar.slider("Early stopping patience", 2, 20, 5)
 
+st.sidebar.divider()
+st.sidebar.subheader("Loss balance")
+loss_weight_bce = st.sidebar.slider(
+    "BCE weight (classification vs regression)",
+    min_value=0.1, max_value=5.0, value=1.0, step=0.1,
+    help="Fixed across all trials. Higher → more weight on drug selection; "
+         "lower → more weight on dose accuracy.",
+)
+
 with st.sidebar.expander("Search space details"):
     if search_method == "optuna":
         st.markdown(
@@ -157,7 +165,7 @@ def _load_pipeline():
     return pipeline
 
 
-def _run_grid(pipeline, model_type, epochs, patience, progress_bar, table_slot):
+def _run_grid(pipeline, model_type, epochs, patience, bce_weight, progress_bar, table_slot):
     grid = {
         "hidden_size": [64, 128],
         "dropout": [0.1, 0.2, 0.3],
@@ -172,36 +180,44 @@ def _run_grid(pipeline, model_type, epochs, patience, progress_bar, table_slot):
     best_model = None
     best_test_ds = None
     best_config = {}
+    best_artifacts = {}
 
     for i, (hs, do, lr, bs) in enumerate(combos):
         metrics, model, test_ds = pipeline.train_and_eval(
             hs, do, lr, bs,
             epochs=epochs, patience=patience, model_type=model_type,
+            loss_weight_bce=bce_weight,
         )
         row = {
             "hidden": hs, "dropout": do, "lr": lr, "batch": bs,
             "val_loss": round(metrics["val_loss"], 5),
+            "F1_ins": round(metrics["f1_insulin"], 3),
+            "F1_tab": round(metrics["f1_tablets"], 3),
+            "ExM_ins": round(metrics["exact_match_insulin"], 3),
             "R2_ins": round(metrics["r2_insulin"], 4),
-            "R2_tab": round(metrics["r2_tablets"], 4),
             "MAE_ins": round(metrics["mae_insulin"], 4),
-            "MAE_tab": round(metrics["mae_tablets"], 4),
         }
         rows.append(row)
-        table_slot.dataframe(pd.DataFrame(rows), use_container_width=True)
+        table_slot.dataframe(pd.DataFrame(rows), width='stretch')
         progress_bar.progress((i + 1) / total, text=f"Trial {i+1}/{total}")
 
         if metrics["val_loss"] < best_loss:
             best_loss = metrics["val_loss"]
             best_model = model
             best_test_ds = test_ds
-            best_config = dict(hidden_size=hs, dropout=do, lr=lr, batch_size=bs)
+            best_config = dict(hidden_size=hs, dropout=do, lr=lr,
+                               batch_size=bs, loss_weight_bce=bce_weight)
+            best_artifacts = dict(pipeline._last_train_artifacts)
 
+    pipeline._last_train_artifacts = best_artifacts
     return rows, best_model, best_test_ds, best_config, best_loss
 
 
-def _run_optuna(pipeline, model_type, n_trials, epochs, patience, progress_bar, table_slot):
+def _run_optuna(pipeline, model_type, n_trials, epochs, patience, bce_weight,
+                progress_bar, table_slot):
     rows = []
-    holder = {"model": None, "test_ds": None, "loss": float("inf"), "config": {}}
+    holder = {"model": None, "test_ds": None, "loss": float("inf"),
+              "config": {}, "artifacts": {}}
 
     def objective(trial):
         hs = trial.suggest_int("hidden_size", 32, 256, log=True)
@@ -216,6 +232,7 @@ def _run_optuna(pipeline, model_type, n_trials, epochs, patience, progress_bar, 
             emb_dim=ed, num_rnn_layers=nl,
             epochs=epochs, patience=patience,
             model_type=model_type,
+            loss_weight_bce=bce_weight,
         )
 
         row = {
@@ -223,8 +240,10 @@ def _run_optuna(pipeline, model_type, n_trials, epochs, patience, progress_bar, 
             "hidden": hs, "layers": nl, "dropout": round(do, 3),
             "lr": f"{lr:.2e}", "batch": bs, "emb": ed,
             "val_loss": round(metrics["val_loss"], 5),
+            "F1_ins": round(metrics["f1_insulin"], 3),
+            "F1_tab": round(metrics["f1_tablets"], 3),
+            "ExM_ins": round(metrics["exact_match_insulin"], 3),
             "R2_ins": round(metrics["r2_insulin"], 4),
-            "R2_tab": round(metrics["r2_tablets"], 4),
         }
         rows.append(row)
         table_slot.dataframe(pd.DataFrame(rows), use_container_width=True)
@@ -238,6 +257,7 @@ def _run_optuna(pipeline, model_type, n_trials, epochs, patience, progress_bar, 
                 model=model, test_ds=test_ds, loss=metrics["val_loss"],
                 config=dict(hidden_size=hs, num_rnn_layers=nl, dropout=do,
                             lr=lr, batch_size=bs, emb_dim=ed),
+                artifacts=dict(pipeline._last_train_artifacts),
             )
         return metrics["val_loss"]
 
@@ -246,6 +266,7 @@ def _run_optuna(pipeline, model_type, n_trials, epochs, patience, progress_bar, 
     )
     study.optimize(objective, n_trials=n_trials)
 
+    pipeline._last_train_artifacts = holder["artifacts"]
     return rows, holder["model"], holder["test_ds"], holder["config"], holder["loss"]
 
 
@@ -300,11 +321,13 @@ with tab_train:
         t0 = time.time()
         if search_method == "grid":
             rows, best_model, best_test_ds, best_cfg, best_loss = _run_grid(
-                pipeline, model_type, epochs, patience, progress, results_table,
+                pipeline, model_type, epochs, patience, loss_weight_bce,
+                progress, results_table,
             )
         else:
             rows, best_model, best_test_ds, best_cfg, best_loss = _run_optuna(
-                pipeline, model_type, n_trials, epochs, patience, progress, results_table,
+                pipeline, model_type, n_trials, epochs, patience,
+                loss_weight_bce, progress, results_table,
             )
         elapsed = time.time() - t0
 
@@ -318,19 +341,44 @@ with tab_train:
         st.subheader("Test-set evaluation")
         test_metrics = _test_evaluation(best_model, best_test_ds)
         if test_metrics:
-            tc1, tc2, tc3, tc4, tc5 = st.columns(5)
-            tc1.metric("Loss", f"{test_metrics['val_loss']:.5f}")
-            tc2.metric("R\u00b2 Insulin", f"{test_metrics['r2_insulin']:.4f}")
-            tc3.metric("R\u00b2 Tablets", f"{test_metrics['r2_tablets']:.4f}")
-            tc4.metric("MAE Insulin", f"{test_metrics['mae_insulin']:.4f}")
-            tc5.metric("MAE Tablets", f"{test_metrics['mae_tablets']:.4f}")
+            st.metric("Combined Loss", f"{test_metrics['val_loss']:.5f}")
+
+            st.markdown("**Drug Selection (Classification)**")
+            cls1, cls2 = st.columns(2)
+            with cls1:
+                st.markdown("*Insulin*")
+                ic1, ic2, ic3, ic4 = st.columns(4)
+                ic1.metric("Precision", f"{test_metrics['prec_insulin']:.3f}")
+                ic2.metric("Recall", f"{test_metrics['recall_insulin']:.3f}")
+                ic3.metric("F1", f"{test_metrics['f1_insulin']:.3f}")
+                ic4.metric("Exact Match", f"{test_metrics['exact_match_insulin']:.3f}")
+            with cls2:
+                st.markdown("*Tablets*")
+                tc1, tc2, tc3, tc4 = st.columns(4)
+                tc1.metric("Precision", f"{test_metrics['prec_tablets']:.3f}")
+                tc2.metric("Recall", f"{test_metrics['recall_tablets']:.3f}")
+                tc3.metric("F1", f"{test_metrics['f1_tablets']:.3f}")
+                tc4.metric("Exact Match", f"{test_metrics['exact_match_tablets']:.3f}")
+
+            st.markdown("**Dose Accuracy (Regression)**")
+            reg1, reg2 = st.columns(2)
+            with reg1:
+                st.markdown("*Insulin*")
+                ri1, ri2 = st.columns(2)
+                ri1.metric("R\u00b2", f"{test_metrics['r2_insulin']:.4f}")
+                ri2.metric("MAE", f"{test_metrics['mae_insulin']:.4f}")
+            with reg2:
+                st.markdown("*Tablets*")
+                rt1, rt2 = st.columns(2)
+                rt1.metric("R\u00b2", f"{test_metrics['r2_tablets']:.4f}")
+                rt2.metric("MAE", f"{test_metrics['mae_tablets']:.4f}")
         else:
             st.warning("Not enough test data to evaluate.")
 
-        # Save model
-        model_path = "best_model.pt"
-        torch.save(best_model.state_dict(), model_path)
-        st.info(f"Model weights saved to `{model_path}`")
+        # Save full checkpoint (model + preprocessing + drug names)
+        ckpt_path = "checkpoint.pt"
+        pipeline.save_checkpoint(best_model, ckpt_path)
+        st.info(f"Full checkpoint saved to `{ckpt_path}` — use with `predict_app.py`")
 
         # Persist run
         run_record = {
@@ -372,13 +420,14 @@ with tab_results:
                 "Search": run["search"],
                 "Val Loss": round(run["best_val_loss"], 5),
                 "Test Loss": round(tm.get("val_loss", 0), 5) if tm else "-",
+                "F1 Ins": round(tm.get("f1_insulin", 0), 3) if tm else "-",
+                "F1 Tab": round(tm.get("f1_tablets", 0), 3) if tm else "-",
+                "ExM Ins": round(tm.get("exact_match_insulin", 0), 3) if tm else "-",
                 "R2 Ins": round(tm.get("r2_insulin", 0), 4) if tm else "-",
-                "R2 Tab": round(tm.get("r2_tablets", 0), 4) if tm else "-",
                 "MAE Ins": round(tm.get("mae_insulin", 0), 4) if tm else "-",
-                "MAE Tab": round(tm.get("mae_tablets", 0), 4) if tm else "-",
                 "Time (min)": run["elapsed_min"],
             })
-        st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(summary_rows), width='stretch', hide_index=True)
 
         # Comparison chart
         if len(history) >= 2:
@@ -399,7 +448,7 @@ with tab_results:
 
         if latest["trials"]:
             with st.expander("All trial results", expanded=False):
-                st.dataframe(pd.DataFrame(latest["trials"]), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(latest["trials"]), width='stretch', hide_index=True)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -448,7 +497,7 @@ with tab_data:
             therapy_counts = pd.Series(
                 [therapy_map.get(w.get("therapy_type"), "Unknown") for w in windows]
             ).value_counts()
-            st.dataframe(therapy_counts.rename("Count"), use_container_width=True)
+            st.dataframe(therapy_counts.rename("Count"), width='stretch')
 
         with col_b:
             st.subheader("Static features (sample)")
@@ -461,4 +510,4 @@ with tab_data:
                 "creatinine", "egfr", "uric_acid", "bun",
             ]
             sample = pd.DataFrame(raw[:10], columns=cols[:len(raw[0])])
-            st.dataframe(sample, use_container_width=True)
+            st.dataframe(sample, width='stretch')
